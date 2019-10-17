@@ -97,7 +97,7 @@ abstract class RingBufferFields<E> extends RingBufferPad
 /**
  * Ring based store of reusable entries containing the data representing
  * an event being exchanged between event producer and {@link EventProcessor}s.
- *
+ * 环形缓冲区对象
  * @param <E> implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored, EventSequencer<E>, EventSink<E>
@@ -208,6 +208,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         int bufferSize,
         WaitStrategy waitStrategy)
     {
+        // 根据类型 创建不同的 环形缓冲区
         switch (producerType)
         {
             case SINGLE:

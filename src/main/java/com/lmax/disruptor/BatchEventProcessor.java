@@ -24,23 +24,48 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * If the {@link EventHandler} also implements {@link LifecycleAware} it will be notified just after the thread
  * is started and just before the thread is shutdown.
- *
+ * 具备批处理能力的
  * @param <T> event implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class BatchEventProcessor<T>
     implements EventProcessor
 {
+    // 代表当前 Processor 的3种状态
     private static final int IDLE = 0;
     private static final int HALTED = IDLE + 1;
     private static final int RUNNING = HALTED + 1;
 
+    /**
+     * 默认属于 空闲状态
+     */
     private final AtomicInteger running = new AtomicInteger(IDLE);
+    /**
+     * 该异常处理器会在捕获到 异常时 打印日志
+     */
     private ExceptionHandler<? super T> exceptionHandler = new FatalExceptionHandler();
+    /**
+     * 数据提供者 只包含一个 get() 方法
+     */
     private final DataProvider<T> dataProvider;
+    /**
+     * 与RingBuffer 交互的 屏障对象 核心方法是waitFor
+     */
     private final SequenceBarrier sequenceBarrier;
+    /**
+     * 事件处理器
+     */
     private final EventHandler<? super T> eventHandler;
+    /**
+     * 代表当前处理的序列  默认是-1
+     */
     private final Sequence sequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
+    /**
+     * 超时处理器 包含 timeout(long sequence) 方法
+     */
     private final TimeoutHandler timeoutHandler;
+    /**
+     * 当处理批数据时的钩子
+     */
     private final BatchStartAware batchStartAware;
 
     /**
@@ -52,9 +77,9 @@ public final class BatchEventProcessor<T>
      * @param eventHandler    is the delegate to which events are dispatched.
      */
     public BatchEventProcessor(
-        final DataProvider<T> dataProvider,
-        final SequenceBarrier sequenceBarrier,
-        final EventHandler<? super T> eventHandler)
+        final DataProvider<T> dataProvider,    // 实际上就是 RingBuffer
+        final SequenceBarrier sequenceBarrier,   // 屏障对象
+        final EventHandler<? super T> eventHandler)  // 事件处理器
     {
         this.dataProvider = dataProvider;
         this.sequenceBarrier = sequenceBarrier;

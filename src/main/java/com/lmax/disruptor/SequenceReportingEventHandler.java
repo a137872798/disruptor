@@ -22,7 +22,7 @@ package com.lmax.disruptor;
  * Typically this would be used when the handler is performing some sort of batching operation such as writing to an IO
  * device; after the operation has completed, the implementation should call {@link Sequence#set} to update the
  * sequence and allow other processes that are dependent on this handler to progress.
- *
+ * 该对象在 处理完事件后 会报告最新的序列
  * @param <T> event implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public interface SequenceReportingEventHandler<T>

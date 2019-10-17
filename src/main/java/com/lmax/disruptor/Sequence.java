@@ -42,6 +42,7 @@ class RhsPadding extends Value
  *
  * <p>Also attempts to be more efficient with regards to false
  * sharing by adding padding around the volatile field.
+ * 使用缓存行填充  实际上内部只是包含一个 volatile value
  */
 public class Sequence extends RhsPadding
 {

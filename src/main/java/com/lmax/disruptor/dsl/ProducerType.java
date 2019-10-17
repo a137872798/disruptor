@@ -22,11 +22,13 @@ public enum ProducerType
 {
     /**
      * Create a RingBuffer with a single event publisher to the RingBuffer
+     * 单生产者
      */
     SINGLE,
 
     /**
      * Create a RingBuffer supporting multiple event publishers to the one RingBuffer
+     * 多生产者
      */
     MULTI
 }

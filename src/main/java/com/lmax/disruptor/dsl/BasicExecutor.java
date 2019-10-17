@@ -8,6 +8,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+/**
+ * 批量执行器  实现JUC 的线程池接口
+ */
 public class BasicExecutor implements Executor
 {
     private final ThreadFactory factory;
@@ -18,6 +21,10 @@ public class BasicExecutor implements Executor
         this.factory = factory;
     }
 
+    /**
+     * 使用了每执行一个任务就创建一个线程的 lowB 工厂
+     * @param command
+     */
     @Override
     public void execute(Runnable command)
     {

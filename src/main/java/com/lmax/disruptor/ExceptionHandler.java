@@ -17,6 +17,7 @@ package com.lmax.disruptor;
 
 /**
  * Callback handler for uncaught exceptions in the event processing cycle of the {@link BatchEventProcessor}
+ * 用于处理未捕获异常
  */
 public interface ExceptionHandler<T>
 {
@@ -25,23 +26,23 @@ public interface ExceptionHandler<T>
      *
      * <p>If the strategy wishes to terminate further processing by the {@link BatchEventProcessor}
      * then it should throw a {@link RuntimeException}.</p>
-     *
+     * 处理异常
      * @param ex       the exception that propagated from the {@link EventHandler}.
-     * @param sequence of the event which cause the exception.
+     * @param sequence of the event which cause the exception.  返回产生异常的序列
      * @param event    being processed when the exception occurred.  This can be null.
      */
     void handleEventException(Throwable ex, long sequence, T event);
 
     /**
      * Callback to notify of an exception during {@link LifecycleAware#onStart()}
-     *
+     * 处理 onStart 时抛出的异常
      * @param ex throw during the starting process.
      */
     void handleOnStartException(Throwable ex);
 
     /**
      * Callback to notify of an exception during {@link LifecycleAware#onShutdown()}
-     *
+     * 处理 onShutdown 抛出的异常
      * @param ex throw during the shutdown process.
      */
     void handleOnShutdownException(Throwable ex);
