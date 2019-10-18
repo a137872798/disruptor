@@ -13,11 +13,15 @@ interface ConsumerInfo
     Sequence[] getSequences();
 
     /**
-     * 获取消费者相关的 序列屏障  消费者通过它来访问 RingBuffer
+     * 获取该消费者相关的 序列屏障  消费者通过它来访问 RingBuffer
      * @return
      */
     SequenceBarrier getBarrier();
 
+    /**
+     * 判断是否追赶上生产者
+     * @return
+     */
     boolean isEndOfChain();
 
     void start(Executor executor);

@@ -50,7 +50,7 @@ public interface SequenceBarrier
 
     /**
      * Alert the {@link EventProcessor}s of a status change and stay in this status until cleared.
-     * 通知 EventProcessor 当前 barrier 处在 警报状态
+     * 代表EventProcessor 当前处在暂停状态
      */
     void alert();
 

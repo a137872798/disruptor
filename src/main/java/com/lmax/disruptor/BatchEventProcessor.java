@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * If the {@link EventHandler} also implements {@link LifecycleAware} it will be notified just after the thread
  * is started and just before the thread is shutdown.
- * 具备批处理能力的
+ * 该对象基本可以看作是一个模板 定义了消费者的处理流程 (包含各种钩子的触发时机)  而能否消费数据的核心逻辑在 barrier 上
  * @param <T> event implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class BatchEventProcessor<T>
@@ -85,13 +85,16 @@ public final class BatchEventProcessor<T>
         this.sequenceBarrier = sequenceBarrier;
         this.eventHandler = eventHandler;
 
+        // 初始化时 直接触发回调
         if (eventHandler instanceof SequenceReportingEventHandler)
         {
             ((SequenceReportingEventHandler<?>) eventHandler).setSequenceCallback(sequence);
         }
 
+        // 当处理批任务时 出入长度触发回调
         batchStartAware =
             (eventHandler instanceof BatchStartAware) ? (BatchStartAware) eventHandler : null;
+        // 针对超时时 传入sequence触发回调
         timeoutHandler =
             (eventHandler instanceof TimeoutHandler) ? (TimeoutHandler) eventHandler : null;
     }
@@ -105,10 +108,15 @@ public final class BatchEventProcessor<T>
     @Override
     public void halt()
     {
+        // 修改标识为 暂停 同时触发 barrier 的 alert
         running.set(HALTED);
         sequenceBarrier.alert();
     }
 
+    /**
+     * 非空闲状态就代表 代表正在运行
+     * @return
+     */
     @Override
     public boolean isRunning()
     {
@@ -117,7 +125,7 @@ public final class BatchEventProcessor<T>
 
     /**
      * Set a new {@link ExceptionHandler} for handling exceptions propagated out of the {@link BatchEventProcessor}
-     *
+     * 设置异常处理器
      * @param exceptionHandler to replace the existing exceptionHandler.
      */
     public void setExceptionHandler(final ExceptionHandler<? super T> exceptionHandler)
@@ -138,20 +146,25 @@ public final class BatchEventProcessor<T>
     @Override
     public void run()
     {
+        // 确保CAS 成功
         if (running.compareAndSet(IDLE, RUNNING))
         {
+            // 清除 之前halt 设置的 标识
             sequenceBarrier.clearAlert();
 
+            // 触发钩子函数
             notifyStart();
             try
             {
                 if (running.get() == RUNNING)
                 {
+                    // 处理事件
                     processEvents();
                 }
             }
             finally
             {
+                // 触发钩子
                 notifyShutdown();
                 running.set(IDLE);
             }
@@ -172,41 +185,59 @@ public final class BatchEventProcessor<T>
         }
     }
 
+    /**
+     * 处理事件的函数
+     */
     private void processEvents()
     {
         T event = null;
+        // 设置下个拉取的sequence
         long nextSequence = sequence.get() + 1L;
 
         while (true)
         {
             try
             {
+                // 通过barrier 从RingBuffer 拉取数据
+                // availableSequence 代表 最后可用的 序列 也就是 nextSequence 到 availableSequence 之间的数据都可以处理
+                // 为什么可能一次会获取多个数据呢
+                // 在ringbuffer 写入数据时 可能后申请到slot 的生产者先完成数据的创建 但是这时它不能提交 必须等待之前的slot提交
+                // 这样的话就可能有很多事件囤积 这时就可以批量处理了
                 final long availableSequence = sequenceBarrier.waitFor(nextSequence);
                 if (batchStartAware != null && availableSequence >= nextSequence)
                 {
+                    // 触发钩子
                     batchStartAware.onBatchStart(availableSequence - nextSequence + 1);
                 }
 
                 while (nextSequence <= availableSequence)
                 {
+                    // 从ringbuffer 中拉取数据  看来首先通过barrier 阻塞获取某个 下标 等到被唤醒时 代表ringbuffer已经填入了数据
+                    // 这时 不断拉取事件并 处理 追赶上生产者
                     event = dataProvider.get(nextSequence);
+                    // 传入当前的 事件 和当前的偏移量 第三个参数 代表当前是否正在处理最后一个任务
                     eventHandler.onEvent(event, nextSequence, nextSequence == availableSequence);
                     nextSequence++;
                 }
 
+                // 更新偏移量
                 sequence.set(availableSequence);
             }
             catch (final TimeoutException e)
             {
+                // waitFor 可能会超时 这时就抛出超时异常
                 notifyTimeout(sequence.get());
             }
+            // 什么时候会出现这种情况???
             catch (final AlertException ex)
             {
+                // 退出循环
                 if (running.get() != RUNNING)
                 {
                     break;
                 }
             }
+            // 遇到异常时 使用 exceptionHandler 去处理 同时 增加sequence 确保之后的数据能正常处理
             catch (final Throwable ex)
             {
                 exceptionHandler.handleEventException(ex, nextSequence, event);
@@ -216,12 +247,19 @@ public final class BatchEventProcessor<T>
         }
     }
 
+    /**
+     * 提前退出  同时触发 start 和 shutdown 的钩子
+     */
     private void earlyExit()
     {
         notifyStart();
         notifyShutdown();
     }
 
+    /**
+     * 当超时时触发
+     * @param availableSequence
+     */
     private void notifyTimeout(final long availableSequence)
     {
         try
@@ -239,6 +277,7 @@ public final class BatchEventProcessor<T>
 
     /**
      * Notifies the EventHandler when this processor is starting up
+     * 如果 EventHandler 继承 LifecycleAware 接口 触发对应钩子
      */
     private void notifyStart()
     {

@@ -15,6 +15,9 @@
  */
 package com.lmax.disruptor;
 
+/**
+ * 释放对象???
+ */
 public interface EventReleaser
 {
     void release();

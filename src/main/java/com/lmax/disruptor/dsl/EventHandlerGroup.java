@@ -25,13 +25,19 @@ import java.util.Arrays;
 
 /**
  * A group of {@link EventProcessor}s used as part of the {@link Disruptor}.
- *
+ * 为disruptor 设置handler 时会返回一个group 对象
  * @param <T> the type of entry used by the event processors.
  */
 public class EventHandlerGroup<T>
 {
     private final Disruptor<T> disruptor;
+    /**
+     * 内部维护了 某个disruptor 对象维护的所有 handler
+     */
     private final ConsumerRepository<T> consumerRepository;
+    /**
+     * 设置的handler 对应的序列
+     */
     private final Sequence[] sequences;
 
     EventHandlerGroup(
@@ -46,7 +52,7 @@ public class EventHandlerGroup<T>
 
     /**
      * Create a new event handler group that combines the consumers in this group with <code>otherHandlerGroup</code>.
-     *
+     * 将2个 handler 组合后返回
      * @param otherHandlerGroup the event handler group to combine.
      * @return a new EventHandlerGroup combining the existing and new consumers into a single dependency group.
      */

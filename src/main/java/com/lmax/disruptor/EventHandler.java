@@ -31,9 +31,9 @@ public interface EventHandler<T>
      * operation.  Implementations should ensure that the operation is always performed when endOfBatch is true as
      * the time between that message and the next one is indeterminate.
      *
-     * @param event      published to the {@link RingBuffer}
-     * @param sequence   of the event being processed
-     * @param endOfBatch flag to indicate if this is the last event in a batch from the {@link RingBuffer}
+     * @param event      published to the {@link RingBuffer}    当前正在处理的事件(从 ringbuffer中获取)
+     * @param sequence   of the event being processed    当前处理的事件对应的 下标
+     * @param endOfBatch flag to indicate if this is the last event in a batch from the {@link RingBuffer}   当前处理的事件是否是本次批处理的最后一个任务
      * @throws Exception if the EventHandler would like the exception handled further up the chain.
      */
     void onEvent(T event, long sequence, boolean endOfBatch) throws Exception;

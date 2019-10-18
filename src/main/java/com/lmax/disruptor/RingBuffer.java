@@ -98,6 +98,7 @@ abstract class RingBufferFields<E> extends RingBufferPad
  * Ring based store of reusable entries containing the data representing
  * an event being exchanged between event producer and {@link EventProcessor}s.
  * 环形缓冲区对象
+ * EventSequencer 具备 返回当前下标 和预分配内存(用于写入数据)  同时继承 dataprovider 传入一个序列返回一个数据
  * @param <E> implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored, EventSequencer<E>, EventSink<E>
@@ -144,14 +145,15 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Create a new multiple producer RingBuffer using the default wait strategy  {@link BlockingWaitStrategy}.
      *
      * @param <E> Class of the event stored in the ring buffer.
-     * @param factory    used to create the events within the ring buffer.
-     * @param bufferSize number of elements to create within the ring buffer.
+     * @param factory    used to create the events within the ring buffer.  事件创建工厂
+     * @param bufferSize number of elements to create within the ring buffer.   声明的环形缓冲区大小
      * @return a constructed ring buffer.
      * @throws IllegalArgumentException if <code>bufferSize</code> is less than 1 or not a power of 2
      * @see MultiProducerSequencer
      */
     public static <E> RingBuffer<E> createMultiProducer(EventFactory<E> factory, int bufferSize)
     {
+        // 默认采用多生产者的方式 创建
         return createMultiProducer(factory, bufferSize, new BlockingWaitStrategy());
     }
 

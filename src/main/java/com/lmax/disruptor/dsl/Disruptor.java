@@ -240,6 +240,7 @@ public class Disruptor<T> {
      * Each event will only be processed by one of the work handlers.
      * The Disruptor will automatically start this processors when {@link #start()} is called.
      *
+     * 传入WorkHandler 时 创建 WorkerPool 对象
      * @param workHandlers the work handlers that will process events.
      * @return a {@link EventHandlerGroup} that can be used to chain dependencies.
      */
@@ -387,11 +388,13 @@ public class Disruptor<T> {
      * be processed by the slowest event processor.</p>
      *
      * <p>This method must only be called once after all event processors have been added.</p>
-     *
+     * 启动
      * @return the configured ring buffer.
      */
     public RingBuffer<T> start() {
+        // 确保started 为 false
         checkOnlyStartedOnce();
+        // 每个eventHandler/ workerHandler 都会注册到consumerRepository 中 通过这样来统一启动
         for (final ConsumerInfo consumerInfo : consumerRepository) {
             consumerInfo.start(executor);
         }
@@ -540,19 +543,28 @@ public class Disruptor<T> {
             final BatchEventProcessor<T> batchEventProcessor =
                     new BatchEventProcessor<>(ringBuffer, barrier, eventHandler);
 
+            // 如果存在异常处理器的话 设置到 processor中
             if (exceptionHandler != null) {
                 batchEventProcessor.setExceptionHandler(exceptionHandler);
             }
 
+            // 将本对象存储到仓库中统一管理
             consumerRepository.add(batchEventProcessor, eventHandler, barrier);
+            // 填充序列数组 每个元素 对应之前的 eventHandler
             processorSequences[i] = batchEventProcessor.getSequence();
         }
 
+        //
         updateGatingSequencesForNextInChain(barrierSequences, processorSequences);
 
         return new EventHandlerGroup<>(this, consumerRepository, processorSequences);
     }
 
+    /**
+     *
+     * @param barrierSequences   初始化 barrier 使用的数组
+     * @param processorSequences   对应eventHandler 的序列数组
+     */
     private void updateGatingSequencesForNextInChain(final Sequence[] barrierSequences, final Sequence[] processorSequences) {
         if (processorSequences.length > 0) {
             ringBuffer.addGatingSequences(processorSequences);
@@ -579,9 +591,17 @@ public class Disruptor<T> {
         return handleEventsWith(eventProcessors);
     }
 
+    /**
+     * 创建工作池对象
+     * @param barrierSequences   长度为1 的 序列数组
+     * @param workHandlers   一组workHandler 处理器对象    该对象和 EventHandler 很像 也有一个处理事件的方法 传入一个T 类型对象
+     * @return
+     */
     EventHandlerGroup<T> createWorkerPool(
             final Sequence[] barrierSequences, final WorkHandler<? super T>[] workHandlers) {
+        // 同样的 通过一个 序列数组去初始化 barrier 对象
         final SequenceBarrier sequenceBarrier = ringBuffer.newBarrier(barrierSequences);
+        // 初始化工作池对象  与eventHandler 不同的地方在这里 eventHandler 和 eventProcessor 是一对一的关系 这里的话是 多个workerHandler 对一个 eventProcessor
         final WorkerPool<T> workerPool = new WorkerPool<>(ringBuffer, sequenceBarrier, exceptionHandler, workHandlers);
 
 
