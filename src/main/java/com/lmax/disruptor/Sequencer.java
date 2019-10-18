@@ -17,6 +17,7 @@ package com.lmax.disruptor;
 
 /**
  * Coordinates claiming sequences for access to a data structure while tracking dependent {@link Sequence}s
+ * 序列控制器 可以通过序列数组创建屏障对象
  */
 public interface Sequencer extends Cursored, Sequenced
 {

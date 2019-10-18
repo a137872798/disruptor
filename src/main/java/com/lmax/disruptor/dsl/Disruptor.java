@@ -518,9 +518,8 @@ public class Disruptor<T> {
 
     /**
      * 使用一个 sequence 序列数组 和 一个 事件处理器数组
-     * 推测 2个数组元素数量应该是相等的 每个 Sequence 对应一个消费者 而每个eventHandler 就对应某个消费者的处理逻辑
-     * @param barrierSequences
-     * @param eventHandlers
+     * @param barrierSequences  该参数是做什么的???
+     * @param eventHandlers  事件处理器
      * @return
      */
     EventHandlerGroup<T> createEventProcessors(
@@ -529,7 +528,7 @@ public class Disruptor<T> {
         // 确保还没有启动 启动后不能设置事件处理器
         checkNotStarted();
 
-        // 创建对应长度的序列
+        // 根据handlers 的长度 创建对应长度的序列
         final Sequence[] processorSequences = new Sequence[eventHandlers.length];
         // 使用序列数组创建 序列屏障  消费者就是通过序列屏障去访问 RingBuffer 的
         final SequenceBarrier barrier = ringBuffer.newBarrier(barrierSequences);
