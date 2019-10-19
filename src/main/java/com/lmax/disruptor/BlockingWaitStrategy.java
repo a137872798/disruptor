@@ -21,11 +21,25 @@ import com.lmax.disruptor.util.ThreadHints;
  * Blocking strategy that uses a lock and condition variable for {@link EventProcessor}s waiting on a barrier.
  * <p>
  * This strategy can be used when throughput and low-latency are not as important as CPU resource.
+ * 基于 阻塞实现的 等待策略
  */
 public final class BlockingWaitStrategy implements WaitStrategy
 {
+    /**
+     * 看来是基于 JVM 内置锁实现
+     */
     private final Object mutex = new Object();
 
+    /**
+     *
+     * @param sequence          to be waited on.            代表等待的序列
+     * @param cursorSequence                                代表barrier 的下标  processor 是通过 barrier 去调用waitStrategy 的
+     * @param dependentSequence on which to wait.
+     * @param barrier           the processor is waiting on.
+     * @return
+     * @throws AlertException
+     * @throws InterruptedException
+     */
     @Override
     public long waitFor(long sequence, Sequence cursorSequence, Sequence dependentSequence, SequenceBarrier barrier)
         throws AlertException, InterruptedException
@@ -52,6 +66,9 @@ public final class BlockingWaitStrategy implements WaitStrategy
         return availableSequence;
     }
 
+    /**
+     * 外部线程 获取该锁并唤醒该对象
+     */
     @Override
     public void signalAllWhenBlocking()
     {

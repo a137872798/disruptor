@@ -24,6 +24,7 @@ import com.lmax.disruptor.util.Util;
  * Base class for the various sequencer types (single/multi).  Provides
  * common functionality like the management of gating sequences (add/remove) and
  * ownership of the current cursor.
+ * 该对象用于控制sequence 的变化
  * 子类有 多生产者 单生产者
  */
 public abstract class AbstractSequencer implements Sequencer
@@ -43,19 +44,20 @@ public abstract class AbstractSequencer implements Sequencer
      */
     protected final WaitStrategy waitStrategy;
     /**
-     * 携带一个 光标 应该是读取哪个可以写入
+     * 该对象 有自己的 光标 每次往该对象中添加新的 序列时 默认都会使用该光标进行初始化
      */
     protected final Sequence cursor = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
     /**
-     * 一组门对象
+     * 一组序列对象
      */
     protected volatile Sequence[] gatingSequences = new Sequence[0];
 
     /**
      * Create with the specified buffer size and wait strategy.
+     * 使用指定的桶大小和一个等待策略 初始化sequencer 对象
      *
-     * @param bufferSize   The total number of entries, must be a positive power of 2.
-     * @param waitStrategy The wait strategy used by this sequencer
+     * @param bufferSize   The total number of entries, must be a positive power of 2.  桶的大小
+     * @param waitStrategy The wait strategy used by this sequencer     等待策略
      */
     public AbstractSequencer(int bufferSize, WaitStrategy waitStrategy)
     {
@@ -73,6 +75,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 获取当前光标
      * @see Sequencer#getCursor()
      */
     @Override
@@ -82,6 +85,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 获取 RingBuffer 的大小
      * @see Sequencer#getBufferSize()
      */
     @Override
@@ -91,6 +95,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 为该对象序列组增加序列  使用该对象当前的光标作为 序列初始值
      * @see Sequencer#addGatingSequences(Sequence...)
      */
     @Override
@@ -100,6 +105,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 从序列数组中移除指定的序列对象
      * @see Sequencer#removeGatingSequence(Sequence)
      */
     @Override
@@ -109,6 +115,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 获取该组序列中最小的值  cursor 作为默认值  这里 cursor 本身不会被改变
      * @see Sequencer#getMinimumSequence()
      */
     @Override
@@ -118,6 +125,7 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
+     * 通过传入一组 序列创建一个 屏障  该组序列会依赖于 该屏障对象
      * @see Sequencer#newBarrier(Sequence...)
      */
     @Override

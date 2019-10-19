@@ -21,14 +21,18 @@ import com.lmax.disruptor.util.Util;
 
 /**
  * Hides a group of Sequences behind a single Sequence
+ * 内部包含一组序列 对外展示为一个序列的特性
  */
 public final class FixedSequenceGroup extends Sequence
 {
+    /**
+     * 内部封装的一组序列
+     */
     private final Sequence[] sequences;
 
     /**
      * Constructor
-     *
+     * 这里使用深拷贝
      * @param sequences the list of sequences to be tracked under this sequence group
      */
     public FixedSequenceGroup(Sequence[] sequences)
@@ -38,7 +42,7 @@ public final class FixedSequenceGroup extends Sequence
 
     /**
      * Get the minimum sequence value for the group.
-     *
+     * 获取序列就是获取 该序列数组中的最小序列
      * @return the minimum sequence value for the group.
      */
     @Override
@@ -52,6 +56,8 @@ public final class FixedSequenceGroup extends Sequence
     {
         return Arrays.toString(sequences);
     }
+
+    // 不支持对数值进行修改
 
     /**
      * Not supported.

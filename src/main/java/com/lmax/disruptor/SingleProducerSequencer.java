@@ -19,6 +19,9 @@ import java.util.concurrent.locks.LockSupport;
 
 import com.lmax.disruptor.util.Util;
 
+/**
+ * 缓存行填充
+ */
 abstract class SingleProducerSequencerPad extends AbstractSequencer
 {
     protected long p1, p2, p3, p4, p5, p6, p7;
@@ -38,6 +41,7 @@ abstract class SingleProducerSequencerFields extends SingleProducerSequencerPad
 
     /**
      * Set to -1 as sequence starting point
+     * 这里只是使用了普通的 long  在 MultiProducer 中使用了 一个Sequence 作为 目标序列 (特点就是使用了缓存行填充 以及 volatile修饰的 long )
      */
     long nextValue = Sequence.INITIAL_VALUE;
     long cachedValue = Sequence.INITIAL_VALUE;
@@ -58,8 +62,8 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     /**
      * Construct a Sequencer with the selected wait strategy and buffer size.
      *
-     * @param bufferSize   the size of the buffer that this will sequence over.
-     * @param waitStrategy for those waiting on sequences.
+     * @param bufferSize   the size of the buffer that this will sequence over.    ringBuffer 的大小
+     * @param waitStrategy for those waiting on sequences.                         等待策略
      */
     public SingleProducerSequencer(int bufferSize, WaitStrategy waitStrategy)
     {
@@ -75,8 +79,15 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
         return hasAvailableCapacity(requiredCapacity, false);
     }
 
+    /**
+     * 根据需要的大小判断是否有空间
+     * @param requiredCapacity
+     * @param doStore  是否保存cursor
+     * @return
+     */
     private boolean hasAvailableCapacity(int requiredCapacity, boolean doStore)
     {
+        // 获取下一个数值
         long nextValue = this.nextValue;
 
         long wrapPoint = (nextValue + requiredCapacity) - bufferSize;
@@ -111,6 +122,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
+     * 将下标更新成给定值 (前提是有足够空间 否则会自旋等待)
      * @see Sequencer#next(int)
      */
     @Override
@@ -155,6 +167,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
+     * 成功的话 同时修改 cursor 失败 抛出异常
      * @see Sequencer#tryNext(int)
      */
     @Override
@@ -198,6 +211,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
+     * 发布事件
      * @see Sequencer#publish(long)
      */
     @Override

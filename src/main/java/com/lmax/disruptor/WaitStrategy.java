@@ -44,6 +44,7 @@ public interface WaitStrategy
 
     /**
      * Implementations should signal the waiting {@link EventProcessor}s that the cursor has advanced.
+     * 通知所有消费者去消费数据
      */
     void signalAllWhenBlocking();
 }
