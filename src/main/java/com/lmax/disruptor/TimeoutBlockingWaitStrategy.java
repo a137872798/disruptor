@@ -25,7 +25,7 @@ public class TimeoutBlockingWaitStrategy implements WaitStrategy
     @Override
     public long waitFor(
         final long sequence,
-        final Sequence cursorSequence,
+        final Sequence cursorSequence,   // 有些策略会用到这些值 有些又用不到 为啥???
         final Sequence dependentSequence,
         final SequenceBarrier barrier)
         throws AlertException, InterruptedException, TimeoutException
@@ -49,6 +49,7 @@ public class TimeoutBlockingWaitStrategy implements WaitStrategy
             }
         }
 
+        // 自旋 直到消费者 追赶上进度
         while ((availableSequence = dependentSequence.get()) < sequence)
         {
             barrier.checkAlert();

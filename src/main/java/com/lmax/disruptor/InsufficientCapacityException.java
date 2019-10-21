@@ -21,6 +21,7 @@ package com.lmax.disruptor;
  * specifically when claiming with the {@link RingBuffer#tryNext()} call.</p>
  *
  * <p>For efficiency this exception will not have a stack trace.</p>
+ * 检测到 容量不足时 抛出的异常
  */
 @SuppressWarnings("serial")
 public final class InsufficientCapacityException extends Exception

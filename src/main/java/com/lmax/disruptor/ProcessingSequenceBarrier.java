@@ -27,6 +27,10 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
      * 等待策略
      */
     private final WaitStrategy waitStrategy;
+
+    /**
+     * 代表该消费者 是否有其他前置的消费者
+     */
     private final Sequence dependentSequence;
     /**
      * 是否处在禁止状态
@@ -42,22 +46,22 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
     private final Sequencer sequencer;
 
     ProcessingSequenceBarrier(
-        final Sequencer sequencer,        // 初始化序列控制器
+        final Sequencer sequencer,        // 生产者序列控制器
         final WaitStrategy waitStrategy,   // 设置等待策略
-        final Sequence cursorSequence,    // 当前光标
+        final Sequence cursorSequence,    // 生产者当前光标
         final Sequence[] dependentSequences)
     {
         this.sequencer = sequencer;
         this.waitStrategy = waitStrategy;
         this.cursorSequence = cursorSequence;
-        // 默认情况 dependentSequences =  cursorSequence
+        // 当没有依赖其他消费者时  依赖的消费者就是自身
         if (0 == dependentSequences.length)
         {
             dependentSequence = cursorSequence;
         }
         else
         {
-            // 将一组序列包装成单个序列对象 只允许查询数据 不支持设置数据
+            // 将一组序列包装成单个序列对象 只允许查询数据 不支持设置数据  该对象能够 直接返回当前依赖的消费者的最小偏移量
             dependentSequence = new FixedSequenceGroup(dependentSequences);
         }
     }
@@ -91,7 +95,7 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
     }
 
     /**
-     * 获取 依赖该栅栏的 序列的光标 如果是一个序列数组 会返回最小的序列值
+     * dependentSequence 默认情况 就是cursorSequence 如果有其他依赖的消费者 就是返回其他消费者的最小偏移量
      * @return
      */
     @Override

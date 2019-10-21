@@ -27,7 +27,7 @@ import com.lmax.disruptor.util.Util;
  * 该对象用于控制sequence 的变化
  * 子类有 多生产者 单生产者
  */
-public abstract class AbstractSequencer implements Sequencer
+public abstract class   AbstractSequencer implements Sequencer
 {
     /**
      * 该字段使用原子更新
@@ -48,7 +48,7 @@ public abstract class AbstractSequencer implements Sequencer
      */
     protected final Sequence cursor = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
     /**
-     * 一组序列对象
+     * 记录了消费者 序列的数组 每个生产者 想要申请槽时 必须确保该槽已经被消费者处理
      */
     protected volatile Sequence[] gatingSequences = new Sequence[0];
 
@@ -96,6 +96,7 @@ public abstract class AbstractSequencer implements Sequencer
 
     /**
      * 为该对象序列组增加序列  使用该对象当前的光标作为 序列初始值
+     * 注意 插入的gate 默认的光标就是 sequencer.getCursor 也就是返回 volatile 变量
      * @see Sequencer#addGatingSequences(Sequence...)
      */
     @Override
@@ -125,12 +126,13 @@ public abstract class AbstractSequencer implements Sequencer
     }
 
     /**
-     * 通过传入一组 序列创建一个 屏障  该组序列会依赖于 该屏障对象
+     * 通过传入一组 序列创建一个 屏障
      * @see Sequencer#newBarrier(Sequence...)
      */
     @Override
     public SequenceBarrier newBarrier(Sequence... sequencesToTrack)
     {
+        // 这里把生产者 和 光标携带过去
         return new ProcessingSequenceBarrier(this, waitStrategy, cursor, sequencesToTrack);
     }
 

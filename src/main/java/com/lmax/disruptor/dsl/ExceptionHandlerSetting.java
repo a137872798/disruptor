@@ -25,10 +25,14 @@ import com.lmax.disruptor.ExceptionHandler;
  * For example:
  * <pre><code>disruptorWizard.handleExceptionsIn(eventHandler).with(exceptionHandler);</code></pre>
  *
+ * 针对某类事件 使用特殊的异常处理器去处理
  * @param <T> the type of event being handled.
  */
 public class ExceptionHandlerSetting<T>
 {
+    /**
+     * 事件处理器
+     */
     private final EventHandler<T> eventHandler;
     private final ConsumerRepository<T> consumerRepository;
 
@@ -43,15 +47,18 @@ public class ExceptionHandlerSetting<T>
     /**
      * Specify the {@link ExceptionHandler} to use with the event handler.
      *
+     * 通过事件处理器 去消费者仓库找到对应的处理器 之后设置异常处理器
      * @param exceptionHandler the exception handler to use.
      */
     @SuppressWarnings("unchecked")
     public void with(ExceptionHandler<? super T> exceptionHandler)
     {
         final EventProcessor eventProcessor = consumerRepository.getEventProcessorFor(eventHandler);
+        // 必须确保是 批处理对象 而非 workProcessor
         if (eventProcessor instanceof BatchEventProcessor)
         {
             ((BatchEventProcessor<T>) eventProcessor).setExceptionHandler(exceptionHandler);
+            // 将当前barrier 设置成禁止状态(这时调用waitFor 会抛出异常) 且唤醒所有阻塞线程
             consumerRepository.getBarrierFor(eventHandler).alert();
         }
         else

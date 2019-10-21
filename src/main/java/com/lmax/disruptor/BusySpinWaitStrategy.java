@@ -33,6 +33,7 @@ public final class BusySpinWaitStrategy implements WaitStrategy
     {
         long availableSequence;
 
+        // 确保依赖的 消费者 都处理完 使用自旋
         while ((availableSequence = dependentSequence.get()) < sequence)
         {
             barrier.checkAlert();

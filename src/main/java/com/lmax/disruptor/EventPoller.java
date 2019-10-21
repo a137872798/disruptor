@@ -2,19 +2,33 @@ package com.lmax.disruptor;
 
 /**
  * Experimental poll-based interface for the Disruptor.
+ * 拉取事件
  */
 public class EventPoller<T>
 {
+    /**
+     * 提供数据对象 实际上就是ringBuffer
+     */
     private final DataProvider<T> dataProvider;
+    /**
+     * 生产者通过 sequencer 向 ringBuffer 申请空间 并写入事件
+     */
     private final Sequencer sequencer;
+    /**
+     * 代表从 哪里开始拉取数据
+     */
     private final Sequence sequence;
     private final Sequence gatingSequence;
+
 
     public interface Handler<T>
     {
         boolean onEvent(T event, long sequence, boolean endOfBatch) throws Exception;
     }
 
+    /**
+     * 拉取事件的3种状态  处理中  空闲   门???
+     */
     public enum PollState
     {
         PROCESSING, GATING, IDLE

@@ -8,7 +8,8 @@ public interface EventSink<E>
      * event from the ring buffer and publishing the claimed sequence
      * after translation.
      *
-     * @param translator The user specified translation for the event
+     * 发布事件
+     * @param translator The user specified translation for the event  该对象可以对事件做一层转换
      */
     void publishEvent(EventTranslator<E> translator);
 
@@ -19,6 +20,7 @@ public interface EventSink<E>
      * after translation.  Will return false if specified capacity
      * was not available.
      *
+     * 尝试发布事件
      * @param translator The user specified translation for the event
      * @return true if the value was published, false if there was insufficient
      * capacity.

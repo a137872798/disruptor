@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 /**
  * Convenience implementation of an exception handler that using standard JDK logging to log
  * the exception as {@link Level}.INFO
+ * 仅打印 INFO 级别日志不做其他处理
  */
 public final class IgnoreExceptionHandler implements ExceptionHandler<Object>
 {

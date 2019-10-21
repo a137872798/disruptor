@@ -17,11 +17,11 @@ package com.lmax.disruptor;
 
 /**
  * An aggregate collection of {@link EventHandler}s that get called in sequence for each event.
- *
+ * 聚合的事件处理器  就是将异常分发到所有的handler 中
  * @param <T> event implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class AggregateEventHandler<T>
-    implements EventHandler<T>, LifecycleAware
+    implements EventHandler<T>, LifecycleAware    // LifecycleAware 代表 onStart onShutdown
 {
     private final EventHandler<T>[] eventHandlers;
 

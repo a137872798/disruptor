@@ -28,6 +28,9 @@ abstract class RingBufferPad
 
 abstract class RingBufferFields<E> extends RingBufferPad
 {
+    /**
+     * 将整个buffer作为对象进行缓存行填充
+     */
     private static final int BUFFER_PAD;
     private static final long REF_ARRAY_BASE;
     private static final int REF_ELEMENT_SHIFT;
@@ -48,8 +51,10 @@ abstract class RingBufferFields<E> extends RingBufferPad
         {
             throw new IllegalStateException("Unknown pointer size");
         }
+        // 看来缓存行填充都是按照128 来计算的
         BUFFER_PAD = 128 / scale;
         // Including the buffer pad in the array base offset
+        // 设置基础偏移量
         REF_ARRAY_BASE = UNSAFE.arrayBaseOffset(Object[].class) + 128;
     }
 
@@ -58,6 +63,11 @@ abstract class RingBufferFields<E> extends RingBufferPad
     protected final int bufferSize;
     protected final Sequencer sequencer;
 
+    /**
+     *
+     * @param eventFactory
+     * @param sequencer 代表生产者与 ringBuffer 交互的对象
+     */
     RingBufferFields(
         EventFactory<E> eventFactory,
         Sequencer sequencer)
@@ -74,8 +84,11 @@ abstract class RingBufferFields<E> extends RingBufferPad
             throw new IllegalArgumentException("bufferSize must be a power of 2");
         }
 
+        // 计算掩码
         this.indexMask = bufferSize - 1;
+        // *2 代表填充左右2侧
         this.entries = new Object[sequencer.getBufferSize() + 2 * BUFFER_PAD];
+        // 使用元素填充数组
         fill(eventFactory);
     }
 
@@ -83,10 +96,17 @@ abstract class RingBufferFields<E> extends RingBufferPad
     {
         for (int i = 0; i < bufferSize; i++)
         {
+            // 一开始就用空对象进行占位  这样尽可能减少频繁创建对象和 销毁对象 进而减少GC的触发频率
+            // 这里从 填充位开始
             entries[BUFFER_PAD + i] = eventFactory.newInstance();
         }
     }
 
+    /**
+     * 使用 UNSAFE 获取 指定元素
+     * @param sequence
+     * @return
+     */
     @SuppressWarnings("unchecked")
     protected final E elementAt(long sequence)
     {
@@ -99,10 +119,14 @@ abstract class RingBufferFields<E> extends RingBufferPad
  * an event being exchanged between event producer and {@link EventProcessor}s.
  * 环形缓冲区对象
  * EventSequencer 具备 返回当前下标 和预分配内存(用于写入数据)  同时继承 dataprovider 传入一个序列返回一个数据
+ * EventSink  代表具备发布事件的能力 也就是 生产者将事件添加到 RingBuffer中
  * @param <E> implementation storing the data for sharing during exchange or parallel coordination of an event.
  */
 public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored, EventSequencer<E>, EventSink<E>
 {
+    /**
+     *
+     */
     public static final long INITIAL_CURSOR_VALUE = Sequence.INITIAL_VALUE;
     protected long p1, p2, p3, p4, p5, p6, p7;
 
@@ -110,7 +134,8 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Construct a RingBuffer with the full option set.
      *
      * @param eventFactory to newInstance entries for filling the RingBuffer
-     * @param sequencer    sequencer to handle the ordering of events moving through the RingBuffer.
+     * @param sequencer    sequencer to handle the ordering of events moving through the RingBuffer.       序列控制器 生产者/消费者 不能直接访问序列 而是通过该对象
+     *                                                                                                     并发措施在该对象内部实现
      * @throws IllegalArgumentException if bufferSize is less than 1 or not a power of 2
      */
     RingBuffer(
@@ -123,10 +148,11 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
     /**
      * Create a new multiple producer RingBuffer with the specified wait strategy.
      *
+     * 使用静态方法 创建 RingBuffer  首先通过对象工厂和等待策略 桶大小 构建多生产者序列对象
      * @param <E> Class of the event stored in the ring buffer.
      * @param factory      used to create the events within the ring buffer.
      * @param bufferSize   number of elements to create within the ring buffer.
-     * @param waitStrategy used to determine how to wait for new elements to become available.
+     * @param waitStrategy used to determine how to wait for new elements to become available.  等待策略
      * @return a constructed ring buffer.
      * @throws IllegalArgumentException if bufferSize is less than 1 or not a power of 2
      * @see MultiProducerSequencer
@@ -136,6 +162,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         int bufferSize,
         WaitStrategy waitStrategy)
     {
+        // 该方法会初始化一个 跟bufferSize 等大的int 数组 每个元素对应一个flag 代表是否可以分配 当生产者分配到某个槽时 通过在对应下标设置值 其他生产者就不能占用该槽了
         MultiProducerSequencer sequencer = new MultiProducerSequencer(bufferSize, waitStrategy);
 
         return new RingBuffer<E>(factory, sequencer);
@@ -153,13 +180,14 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      */
     public static <E> RingBuffer<E> createMultiProducer(EventFactory<E> factory, int bufferSize)
     {
-        // 默认采用多生产者的方式 创建
+        // 使用默认的等待策略 初始化 BlockWaitStrategy 基于 JVM 内置锁
         return createMultiProducer(factory, bufferSize, new BlockingWaitStrategy());
     }
 
     /**
      * Create a new single producer RingBuffer with the specified wait strategy.
      *
+     * 创建 单个生产者的RingBuffer
      * @param <E> Class of the event stored in the ring buffer.
      * @param factory      used to create the events within the ring buffer.
      * @param bufferSize   number of elements to create within the ring buffer.
@@ -181,6 +209,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
     /**
      * Create a new single producer RingBuffer using the default wait strategy  {@link BlockingWaitStrategy}.
      *
+     * 基于默认的策略创建 RingBuffer 对象
      * @param <E> Class of the event stored in the ring buffer.
      * @param factory    used to create the events within the ring buffer.
      * @param bufferSize number of elements to create within the ring buffer.
@@ -234,6 +263,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * that your current consumer sequence and less than or equal to the value returned from
      * the {@link SequenceBarrier#waitFor(long)} method.</p>
      *
+     * 获取 RingBuffer 指定序列对应的 事件
      * @param sequence for the event
      * @return the event for the given sequence
      */
@@ -256,6 +286,8 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * }
      * </pre>
      *
+     * next 返回下个可用的 序列号  之后通过 get方法 获取到对应的事件对象 因为事件一开始就已经完成初始化了 每次都是在事件实体上做一些修改后重新发布 使得对象被重复利用
+     * publish 相当于生产者 创建事件(也就是修改原有事件后) 发布 该动作应该会唤醒 消费者端的栅栏 进而触发所有消费动作
      * @return The next sequence to publish to.
      * @see RingBuffer#publish(long)
      * @see RingBuffer#get(long)
@@ -270,6 +302,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * The same functionality as {@link RingBuffer#next()}, but allows the caller to claim
      * the next n sequences.
      *
+     * 申请指定数量的槽
      * @param n number of slots to claim
      * @return sequence number of the highest slot claimed
      * @see Sequencer#next(int)
@@ -294,7 +327,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * </pre>
      * <p>This method will not block if there is not space available in the ring
      * buffer, instead it will throw an {@link InsufficientCapacityException}.</p>
-     *
+     * 尝试申请 槽 失败 抛出异常
      * @return The next sequence to publish to.
      * @throws InsufficientCapacityException if the necessary space in the ring buffer is not available
      * @see RingBuffer#publish(long)
@@ -339,6 +372,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Sets the cursor to a specific sequence and returns the preallocated entry that is stored there.  This
      * can cause a data race and should only be done in controlled circumstances, e.g. during initialisation.
      *
+     * 将光标设置成指定值并返回该序列对应的 事件  应该在初始化阶段调用该方法 否则可能会产生竞争
      * @param sequence The sequence to claim.
      * @return The preallocated event.
      */
@@ -368,6 +402,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Add the specified gating sequences to this instance of the Disruptor.  They will
      * safely and atomically added to the list of gating sequences.
      *
+     * 该组 门卫 应该就是 消费者序列吧 生产者想要申请槽的前提是所有消费者序列 已经消费完了该槽
      * @param gatingSequences The sequences to add.
      */
     public void addGatingSequences(Sequence... gatingSequences)
@@ -379,6 +414,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Get the minimum sequence value from all of the gating sequences
      * added to this ringBuffer.
      *
+     * 获取 一组 gating 中处理最慢的序列
      * @return The minimum gating sequence or the cursor sequence if
      * no sequences have been added.
      */
@@ -402,6 +438,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Create a new SequenceBarrier to be used by an EventProcessor to track which messages
      * are available to be read from the ring buffer given a list of sequences to track.
      *
+     * 创建一个屏障对象 用于处理消费者 与 ringBuffer 的关系
      * @param sequencesToTrack the additional sequences to track
      * @return A sequence barrier that will track the specified sequences.
      * @see SequenceBarrier

@@ -27,6 +27,7 @@ import java.util.concurrent.locks.LockSupport;
  * Latency spikes can occur after quiet periods.  It will also reduce the impact
  * on the producing thread as it will not need signal any conditional variables
  * to wake up the event handling thread.
+ * 先自旋 之后 线程退让 最后sleep
  */
 public final class SleepingWaitStrategy implements WaitStrategy
 {
@@ -60,6 +61,7 @@ public final class SleepingWaitStrategy implements WaitStrategy
         long availableSequence;
         int counter = retries;
 
+        // 代表还没消费到指定的 偏移量
         while ((availableSequence = dependentSequence.get()) < sequence)
         {
             counter = applyWaitMethod(barrier, counter);
@@ -78,10 +80,12 @@ public final class SleepingWaitStrategy implements WaitStrategy
     {
         barrier.checkAlert();
 
+        // 默认大于100 次 自旋
         if (counter > 100)
         {
             --counter;
         }
+        // 默认 0～100 线程退让
         else if (counter > 0)
         {
             --counter;
@@ -89,6 +93,7 @@ public final class SleepingWaitStrategy implements WaitStrategy
         }
         else
         {
+            // 最后沉睡指定时间
             LockSupport.parkNanos(sleepTimeNs);
         }
 

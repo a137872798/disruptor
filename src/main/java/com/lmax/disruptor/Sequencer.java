@@ -31,6 +31,7 @@ public interface Sequencer extends Cursored, Sequenced
      * Claim a specific sequence.  Only used if initialising the ring buffer to
      * a specific value.
      *
+     * 使用特定位置 作为 ringBuffer 的起点 一般是不需要调用该方法的
      * @param sequence The sequence to initialise too.
      */
     void claim(long sequence);

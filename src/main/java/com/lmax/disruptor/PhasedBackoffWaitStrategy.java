@@ -25,6 +25,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class PhasedBackoffWaitStrategy implements WaitStrategy
 {
+    /**
+     * 自旋的尝试次数为1万次
+     */
     private static final int SPIN_TRIES = 10000;
     private final long spinTimeoutNanos;
     private final long yieldTimeoutNanos;
@@ -40,6 +43,8 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
         this.yieldTimeoutNanos = spinTimeoutNanos + units.toNanos(yieldTimeout);
         this.fallbackStrategy = fallbackStrategy;
     }
+
+    // 下面的方法 将一个普通的 等待策略包装成该对象
 
     /**
      * Construct {@link PhasedBackoffWaitStrategy} with fallback to {@link BlockingWaitStrategy}
@@ -105,6 +110,7 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
 
         do
         {
+            // dependentSequence 代表该消费者 依赖的其他消费者
             if ((availableSequence = dependentSequence.get()) >= sequence)
             {
                 return availableSequence;
@@ -112,6 +118,7 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
 
             if (0 == --counter)
             {
+                // 如果是第一次 那么设置开始时间
                 if (0 == startTime)
                 {
                     startTime = System.nanoTime();
@@ -119,10 +126,12 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
                 else
                 {
                     long timeDelta = System.nanoTime() - startTime;
+                    // 等待时间超过了一定值 使用降级的等待策略
                     if (timeDelta > yieldTimeoutNanos)
                     {
                         return fallbackStrategy.waitFor(sequence, cursor, dependentSequence, barrier);
                     }
+                    // 代表超过了自旋的时间 使用 线程退让机制
                     else if (timeDelta > spinTimeoutNanos)
                     {
                         Thread.yield();
@@ -134,6 +143,9 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
         while (true);
     }
 
+    /**
+     * 委托给降级策略唤醒阻塞
+     */
     @Override
     public void signalAllWhenBlocking()
     {

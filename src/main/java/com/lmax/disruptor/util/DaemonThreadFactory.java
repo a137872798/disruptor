@@ -19,6 +19,7 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * Access to a ThreadFactory instance. All threads are created with setDaemon(true).
+ * 守护线程工厂 确保生成的线程都是守护线程
  */
 public enum DaemonThreadFactory implements ThreadFactory
 {

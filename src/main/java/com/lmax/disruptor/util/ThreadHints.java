@@ -39,6 +39,7 @@ public final class ThreadHints
         MethodHandle methodHandle = null;
         try
         {
+            // 有些版本的Thread 有实现该方法
             methodHandle = lookup.findStatic(Thread.class, "onSpinWait", methodType(void.class));
         }
         catch (final Exception ignore)

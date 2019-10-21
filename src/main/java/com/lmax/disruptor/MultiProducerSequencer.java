@@ -39,7 +39,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
      */
     private static final long BASE = UNSAFE.arrayBaseOffset(int[].class);
     /**
-     * 基于BASE 的偏移量 对应数组下标
+     * 数组中每个元素的偏移量
      */
     private static final long SCALE = UNSAFE.arrayIndexScale(int[].class);
 
@@ -51,7 +51,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
     // availableBuffer tracks the state of each ringbuffer slot
     // see below for more details on the approach
     /**
-     * 该对象映射到环形缓冲区的每个槽的 状态 初始状态下都是-1
+     * 该对象映射到环形缓冲区的每个槽的 状态 初始状态下都是-1  通过 该 flag 可以判断哪些槽是可以使用的
      */
     private final int[] availableBuffer;
     /**
@@ -67,7 +67,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
      * Construct a Sequencer with the selected wait strategy and buffer size.
      * 创建一个多生产者的 序列控制器 （该对象用来驱使ringBuffer 的下标移动）
      * @param bufferSize   the size of the buffer that this will sequence over.
-     * @param waitStrategy for those waiting on sequences.
+     * @param waitStrategy for those waiting on sequences.  生产者在尝试获取槽时发现无槽可用 需要通过等待策略对象阻塞
      */
     public MultiProducerSequencer(int bufferSize, final WaitStrategy waitStrategy)
     {
@@ -151,6 +151,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
     @Override
     public long next(int n)
     {
+        // 这里有限制 每次申请的 长度不能超过一个 bufferSize 的大小
         if (n < 1 || n > bufferSize)
         {
             throw new IllegalArgumentException("n must be > 0 and < bufferSize");
@@ -231,6 +232,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
             current = cursor.get();
             next = current + n;
 
+            // 在多生产者的场景下 申请失败不会修改 cursor
             if (!hasAvailableCapacity(gatingSequences, n, current))
             {
                 throw InsufficientCapacityException.INSTANCE;
@@ -346,12 +348,12 @@ public final class MultiProducerSequencer extends AbstractSequencer
         int index = calculateIndex(sequence);
         int flag = calculateAvailabilityFlag(sequence);
         long bufferAddress = (index * SCALE) + BASE;
-        // 对比 数值是否是flag
+        // 对比 数值是否是flag   应该就是 判断是否提交
         return UNSAFE.getIntVolatile(availableBuffer, bufferAddress) == flag;
     }
 
     /**
-     * 获取 这组序列中 可用的序列 返回失效的最小值
+     * 返回 生产者 允许使用的 最大序列
      * @param lowerBound
      * @param availableSequence The sequence to scan to.
      * @return

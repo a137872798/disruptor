@@ -19,6 +19,7 @@ package com.lmax.disruptor;
  * Used to alert {@link EventProcessor}s waiting at a {@link SequenceBarrier} of status changes.
  * <p>
  * It does not fill in a stack trace for performance reasons.
+ * 代表当前 屏障处于被禁止状态
  */
 @SuppressWarnings("serial")
 public final class AlertException extends Exception

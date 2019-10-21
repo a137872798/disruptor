@@ -71,6 +71,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
+     * 只是用于判断是否有 足够的空间 不会强制更新 volatile 变量
      * @see Sequencer#hasAvailableCapacity(int)
      */
     @Override
@@ -97,6 +98,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
         {
             if (doStore)
             {
+                // 这里会强制更新 父类的 volatile 光标 因为父类有一个 getCursor 方法会返回该值 这样确保外部调用该方法总是返回最新值
                 cursor.setVolatile(nextValue);  // StoreLoad fence
             }
 
@@ -113,6 +115,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
+     * 向 ringBuffer 申请 一个slot 的使用权  配合 publish 提交事件
      * @see Sequencer#next()
      */
     @Override
@@ -133,12 +136,15 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
             throw new IllegalArgumentException("n must be > 0 and < bufferSize");
         }
 
+        // nextValue 会不断增加 直到溢出
         long nextValue = this.nextValue;
 
+        // 代表本次申请后 nextValue 的值
         long nextSequence = nextValue + n;
         long wrapPoint = nextSequence - bufferSize;
         long cachedGatingSequence = this.cachedValue;
 
+        //单生产者 这里不需要用自旋
         if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue)
         {
             cursor.setVolatile(nextValue);  // StoreLoad fence
@@ -152,6 +158,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
             this.cachedValue = minSequence;
         }
 
+        // 因为单生产者 直接修改就好
         this.nextValue = nextSequence;
 
         return nextSequence;
@@ -167,7 +174,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     }
 
     /**
-     * 成功的话 同时修改 cursor 失败 抛出异常
+     * 成功的话 同时修改 cursor (等同于锁定槽)     失败抛出异常
      * @see Sequencer#tryNext(int)
      */
     @Override
