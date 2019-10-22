@@ -228,7 +228,6 @@ public final class BatchEventProcessor<T>
                 // waitFor 可能会超时 这时就抛出超时异常
                 notifyTimeout(sequence.get());
             }
-            // 什么时候会出现这种情况???
             catch (final AlertException ex)
             {
                 // 退出循环

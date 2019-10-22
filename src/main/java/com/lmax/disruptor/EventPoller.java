@@ -18,6 +18,9 @@ public class EventPoller<T>
      * 代表从 哪里开始拉取数据
      */
     private final Sequence sequence;
+    /**
+     * 代表被阻隔的序列
+     */
     private final Sequence gatingSequence;
 
 
@@ -27,7 +30,7 @@ public class EventPoller<T>
     }
 
     /**
-     * 拉取事件的3种状态  处理中  空闲   门???
+     * 拉取事件的3种状态  处理中  空闲  这个 GATING 可能代表 正在被消费者阻塞???
      */
     public enum PollState
     {
@@ -35,10 +38,10 @@ public class EventPoller<T>
     }
 
     public EventPoller(
-        final DataProvider<T> dataProvider,
-        final Sequencer sequencer,
-        final Sequence sequence,
-        final Sequence gatingSequence)
+        final DataProvider<T> dataProvider,     // 就是ringBuffer
+        final Sequencer sequencer,              // 一般就是生产者序列对象
+        final Sequence sequence,                // 起点
+        final Sequence gatingSequence)          // 被阻隔的序列值
     {
         this.dataProvider = dataProvider;
         this.sequencer = sequencer;
@@ -46,10 +49,17 @@ public class EventPoller<T>
         this.gatingSequence = gatingSequence;
     }
 
+    /**
+     * 消费者通过该对象来拉取数据???
+     * @param eventHandler
+     * @return
+     * @throws Exception
+     */
     public PollState poll(final Handler<T> eventHandler) throws Exception
     {
         final long currentSequence = sequence.get();
         long nextSequence = currentSequence + 1;
+        // 获取生产者可用的最下序列 在单生产者下 就是 gatingSequence 的值 该值也代表着 消费者当前这在消费的最小偏移量
         final long availableSequence = sequencer.getHighestPublishedSequence(nextSequence, gatingSequence.get());
 
         if (nextSequence <= availableSequence)
@@ -61,6 +71,7 @@ public class EventPoller<T>
             {
                 do
                 {
+                    // 从ringbuffer 一个个的取出 生产者创建好的事件对象 (实际上对象一开始就创建了 这里只是对对象进行加工)
                     final T event = dataProvider.get(nextSequence);
                     processNextEvent = eventHandler.onEvent(event, nextSequence, nextSequence == availableSequence);
                     processedSequence = nextSequence;
@@ -71,6 +82,7 @@ public class EventPoller<T>
             }
             finally
             {
+                // 消费结束后更新偏移量
                 sequence.set(processedSequence);
             }
 

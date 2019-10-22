@@ -36,9 +36,6 @@ public final class WorkProcessor<T>
      * 该对象自身的 消费序列  推测每个workerHandler 的消费能力不同 需要各自维护序列来做一些事情  比如判断是否积压
      */
     private final Sequence sequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
-    /**
-     * 共用的环形缓冲区
-     */
     private final RingBuffer<T> ringBuffer;
     /**
      * 共用的栅栏 也就是 整个WorkerPool通过一个 barrier 去拉取数据并交给多个 workerProcessor

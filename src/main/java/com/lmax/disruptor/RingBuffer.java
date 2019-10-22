@@ -165,6 +165,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         // 该方法会初始化一个 跟bufferSize 等大的int 数组 每个元素对应一个flag 代表是否可以分配 当生产者分配到某个槽时 通过在对应下标设置值 其他生产者就不能占用该槽了
         MultiProducerSequencer sequencer = new MultiProducerSequencer(bufferSize, waitStrategy);
 
+        // 使用生产者序列器对象来初始化 RingBuffer
         return new RingBuffer<E>(factory, sequencer);
     }
 
@@ -450,7 +451,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
 
     /**
      * Creates an event poller for this ring buffer gated on the supplied sequences.
-     *
+     * 获取一个申请序列的对象
      * @param gatingSequences to be gated on.
      * @return A poller that will gate on this ring buffer and the supplied sequences.
      */
@@ -463,6 +464,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
      * Get the current cursor value for the ring buffer.  The actual value received
      * will depend on the type of {@link Sequencer} that is being used.
      *
+     * getCursor 方法 对应一个 volatile 修饰的long 变量
      * @see MultiProducerSequencer
      * @see SingleProducerSequencer
      */
@@ -497,11 +499,13 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
 
 
     /**
+     * 发布事件
      * @see com.lmax.disruptor.EventSink#publishEvent(com.lmax.disruptor.EventTranslator)
      */
     @Override
     public void publishEvent(EventTranslator<E> translator)
     {
+        // 这里申请新的槽 并更新cursor 后返回 如果发现消费者还未消费完成则自旋
         final long sequence = sequencer.next();
         translateAndPublish(translator, sequence);
     }
@@ -653,6 +657,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
     }
 
     /**
+     * 发布一组事件
      * @see com.lmax.disruptor.EventSink#publishEvents(com.lmax.disruptor.EventTranslator[], int, int)
      */
     @Override
@@ -905,7 +910,7 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
     /**
      * Publish the specified sequence.  This action marks this particular
      * message as being available to be read.
-     *
+     * 发布事件  就是 修改cursor的值 并唤醒所有 阻塞的barrier
      * @param sequence the sequence to publish.
      */
     @Override
@@ -995,6 +1000,11 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         }
     }
 
+    /**
+     * 使用 转换器 转换序列值对应的 对象 并发布
+     * @param translator
+     * @param sequence
+     */
     private void translateAndPublish(EventTranslator<E> translator, long sequence)
     {
         try
@@ -1057,10 +1067,18 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         }
     }
 
+    /**
+     * 批量转换以及发布
+     * @param translators
+     * @param batchStartsAt  从第几个开始
+     * @param batchSize  代表该批数据的长度
+     * @param finalSequence  最后获取的序列值  该值不一定是 batchStartsAt + batchSize 因为 在多生产者情况下 存在并发问题 可能会超过该值
+     */
     private void translateAndPublishBatch(
         final EventTranslator<E>[] translators, int batchStartsAt,
         final int batchSize, final long finalSequence)
     {
+        // 获取初始序列
         final long initialSequence = finalSequence - (batchSize - 1);
         try
         {
@@ -1078,6 +1096,15 @@ public final class RingBuffer<E> extends RingBufferFields<E> implements Cursored
         }
     }
 
+    /**
+     * 批量发布数据
+     * @param translator
+     * @param arg0
+     * @param batchStartsAt
+     * @param batchSize
+     * @param finalSequence
+     * @param <A>
+     */
     private <A> void translateAndPublishBatch(
         final EventTranslatorOneArg<E, A> translator, final A[] arg0,
         int batchStartsAt, final int batchSize, final long finalSequence)

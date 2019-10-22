@@ -54,7 +54,7 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
         this.sequencer = sequencer;
         this.waitStrategy = waitStrategy;
         this.cursorSequence = cursorSequence;
-        // 当没有依赖其他消费者时  依赖的消费者就是自身
+        // 当没有依赖其他消费者时  该光标就是生产者光标
         if (0 == dependentSequences.length)
         {
             dependentSequence = cursorSequence;
@@ -68,6 +68,8 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
 
     /**
      * 阻塞 直到指定的某个序列的数值设置完成
+     * 栅栏对象本身是被多个 eventHandler 共享的  也就是 waitStrategy 会被多个线程访问
+     * 而且每个eventHandler 共享一个生产者光标 确保能读取最新写入的序列
      * @param sequence to wait for
      * @return
      * @throws AlertException
@@ -81,7 +83,7 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
         // 如果当前被设置成禁止状态 抛出异常
         checkAlert();
 
-        // barrier 是通过阻塞策略 等待序列变化的
+        // barrier 是通过阻塞策略 等待序列变化的  cursorSequence 是生产者当前光标 也就是该值应该是小于sequence 的
         long availableSequence = waitStrategy.waitFor(sequence, cursorSequence, dependentSequence, this);
 
         // 返回的可用序列 能比 阻塞需求的序列还小吗???
@@ -90,7 +92,8 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
             return availableSequence;
         }
 
-        // 通过sequencer 进行调配 返回一个合适的序列值
+        // 每当生产者发布一个事件时waitStrategy 都会被唤醒 如果cursorSequence 超过了sequence 就会从waitFor 中退出 但是较早的生产者可能还没有发布事件 这里只允许返回最早的
+        // 可以使用的事件
         return sequencer.getHighestPublishedSequence(sequence, availableSequence);
     }
 

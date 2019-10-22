@@ -36,7 +36,7 @@ public class EventHandlerGroup<T>
      */
     private final ConsumerRepository<T> consumerRepository;
     /**
-     * 设置的handler 对应的序列
+     * 代表消费者组当前消费的序列
      */
     private final Sequence[] sequences;
 

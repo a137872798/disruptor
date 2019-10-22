@@ -172,14 +172,9 @@ public final class MultiProducerSequencer extends AbstractSequencer
             // 获取缓存的 最小的未消费sequence
             long cachedGatingSequence = gatingSequenceCache.get();
 
-            // cachedGatingSequence 存在2种情况
-            // 第一种 在 current的左边 0 --- cachedGatingSequence ---- current --- tail
-            // 第二种 在current 的右边  0 ------ current ----- cachedGatingSequence ----- tail
-            // wrapPoint 从0 数到一个指定的位置 小于 cachedGatingSequence 必然能分配成功 所以大于0 需要重新做判断
-            // 而当小于0 的情况 第一种是肯定能分配的
-            // 第二种情况 小于0 应该是不一定的   TODO 这里还需要更多的信息才好梳理
             if (wrapPoint > cachedGatingSequence || cachedGatingSequence > current)
             {
+                // 生产者内部维护了所有关联的消费者  当消费者处理完事件后会更新 cursour 这样 该方法就能知道消费最慢的序列了
                 long gatingSequence = Util.getMinimumSequence(gatingSequences, current);
 
                 // 代表发生追尾 无法分配 通过LockSupport 配合 自旋
@@ -277,9 +272,9 @@ public final class MultiProducerSequencer extends AbstractSequencer
     @Override
     public void publish(final long sequence)
     {
-        // 代表需要占用该空间
+        // 代表该空间生产者已经成功发布事件
         setAvailable(sequence);
-        // 唤醒所有阻塞对象 也就是 通知对应的消费者有新事件了
+        // 唤醒所有阻塞对象 也就是 通知对应的消费者有新事件了  这时返回的序列值可能还小于 待消费的序列值 因为这里的设置是只要 publish 就一定会唤醒消费者
         waitStrategy.signalAllWhenBlocking();
     }
 
@@ -316,6 +311,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
      * buffer), when we have new data and successfully claimed a slot we can simply
      * write over the top.
      * 设置某个 下标是否可用
+     * @param sequence 序列值 该值始终在增加
      */
     private void setAvailable(final long sequence)
     {
@@ -353,7 +349,7 @@ public final class MultiProducerSequencer extends AbstractSequencer
     }
 
     /**
-     * 返回 生产者 允许使用的 最大序列
+     * 返回 生产者 允许使用的 最大序列   只有当提交 时 isAvailable 才会为true
      * @param lowerBound
      * @param availableSequence The sequence to scan to.
      * @return

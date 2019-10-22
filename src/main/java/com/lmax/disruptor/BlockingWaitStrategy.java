@@ -46,7 +46,7 @@ public final class BlockingWaitStrategy implements WaitStrategy
     {
         long availableSequence;
 
-        // 首先如果消费者偏移量小于生产者 代表本次 尝试获取的 生产者偏移量有效
+        // 首先如果消费者偏移量小于生产者 代表本次尝试获取的生产者偏移量有效
 
         if (cursorSequence.get() < sequence)
         {

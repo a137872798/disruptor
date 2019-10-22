@@ -147,6 +147,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
         //单生产者 这里不需要用自旋
         if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue)
         {
+            // 这里直接更新了光标
             cursor.setVolatile(nextValue);  // StoreLoad fence
 
             long minSequence;
@@ -158,7 +159,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
             this.cachedValue = minSequence;
         }
 
-        // 因为单生产者 直接修改就好
+        // 因为单生产者 直接修改就好 针对单个生产者 调用next 本身不会产生竞争 注意这时会立即更新光标
         this.nextValue = nextSequence;
 
         return nextSequence;
@@ -224,6 +225,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     @Override
     public void publish(long sequence)
     {
+        // 这里更新光标会影响到 barrier 因为他们共用该引用
         cursor.set(sequence);
         waitStrategy.signalAllWhenBlocking();
     }
@@ -249,6 +251,7 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
     @Override
     public long getHighestPublishedSequence(long lowerBound, long availableSequence)
     {
+        // 单生产者只可能一个个发布事件 所以 序列对应的事件可以直接使用 而多生产者的情况 就是从前往后处理事件 如果中间出现中断 不允许处理后面的事件  比如 1 3不能跳过2 直接处理3
         return availableSequence;
     }
 }

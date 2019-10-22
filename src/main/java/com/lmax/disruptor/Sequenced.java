@@ -78,7 +78,7 @@ public interface Sequenced
 
     /**
      * Publishes a sequence. Call when the event has been filled.
-     *
+     * 外部通过调用该方法来发布事件
      * @param sequence the sequence to be published.
      */
     void publish(long sequence);

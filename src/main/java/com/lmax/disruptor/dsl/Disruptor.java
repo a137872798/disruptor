@@ -122,7 +122,7 @@ public class Disruptor<T> {
      *
      * @param eventFactory   the factory to create events in the ring buffer.   构建对象的工厂
      * @param ringBufferSize the size of the ring buffer.  设置环形缓冲区的大小
-     * @param threadFactory  a {@link ThreadFactory} to create threads to for processors.
+     * @param threadFactory  a {@link ThreadFactory} to create threads to for processors.  允许使用自定义线程工厂
      */
     public Disruptor(final EventFactory<T> eventFactory, final int ringBufferSize, final ThreadFactory threadFactory) {
         // 默认创建一个多生产者的 ringbuffer  至于由 MP 和 SP 的分别是因为 SP 在实现上 cursor指针 甚至不需要任何并发措施 只使用一个简单的long
@@ -180,6 +180,7 @@ public class Disruptor<T> {
     @SuppressWarnings("varargs")
     @SafeVarargs
     public final EventHandlerGroup<T> handleEventsWith(final EventHandler<? super T>... handlers) {
+        // 这里分配一个空的序列对象 该对象意味着 某个barrier 是否有依赖其他的消费者 这样必须要该消费者消费完成后才能继续消费
         return createEventProcessors(new Sequence[0], handlers);
     }
 
@@ -229,6 +230,7 @@ public class Disruptor<T> {
             sequences[i] = processors[i].getSequence();
         }
 
+        // 为ringBuffer 内部的生产者序列增加门卫 这样当生产者想要获取新的slot 时 必须先确保该槽已经被消费完毕
         ringBuffer.addGatingSequences(sequences);
 
         return new EventHandlerGroup<>(this, consumerRepository, Util.getSequencesFor(processors));
@@ -294,7 +296,7 @@ public class Disruptor<T> {
      * For example if the handler <code>A</code> must process events before handler <code>B</code>:</p>
      *
      * <pre><code>dw.after(A).handleEventsWith(B);</code></pre>
-     *
+     * 设置具有依赖关系的 handler组(消费者组)
      * @param handlers the event handlers, previously set up with {@link #handleEventsWith(com.lmax.disruptor.EventHandler[])},
      *                 that will form the barrier for subsequent handlers or processors.
      * @return an {@link EventHandlerGroup} that can be used to setup a dependency barrier over the specified event handlers.
@@ -302,6 +304,7 @@ public class Disruptor<T> {
     @SafeVarargs
     @SuppressWarnings("varargs")
     public final EventHandlerGroup<T> after(final EventHandler<T>... handlers) {
+        // 找到这些消费者对应 序列 并用于构建 EventHandlerGroup
         final Sequence[] sequences = new Sequence[handlers.length];
         for (int i = 0, handlersLength = handlers.length; i < handlersLength; i++) {
             sequences[i] = consumerRepository.getSequenceFor(handlers[i]);
@@ -324,7 +327,8 @@ public class Disruptor<T> {
 
     /**
      * Publish an event to the ring buffer.
-     *
+     * 使用转换器来发布事件  这里先调用 生产者的 next 申请slot 之后 根据序列值去 ringBuffer中找到对应对象 之后通过translator处理事件后重新发布 也就是唤醒消费者
+     * 在整个生命周期中 序列值会不断增加
      * @param eventTranslator the translator that will load data into the event.
      */
     public void publishEvent(final EventTranslator<T> eventTranslator) {
@@ -395,6 +399,7 @@ public class Disruptor<T> {
         // 确保started 为 false
         checkOnlyStartedOnce();
         // 每个eventHandler/ workerHandler 都会注册到consumerRepository 中 通过这样来统一启动
+        // 这里会使用线程池启动消费者 消费者 会不断拉取数据 如果生产者还没有加入数据 则进入自旋状态 一旦调用publishEvent 后 生成事件并唤醒阻塞的消费者
         for (final ConsumerInfo consumerInfo : consumerRepository) {
             consumerInfo.start(executor);
         }
@@ -521,12 +526,12 @@ public class Disruptor<T> {
 
     /**
      * 使用一个 sequence 序列数组 和 一个 事件处理器数组
-     * @param barrierSequences  该参数是做什么的???
+     * @param barrierSequences  该值代表 生成的栅栏内部有多少 序列
      * @param eventHandlers  事件处理器
      * @return
      */
     EventHandlerGroup<T> createEventProcessors(
-            final Sequence[] barrierSequences,
+            final Sequence[] barrierSequences,  // 代表 barrier 依赖的其他栅栏 一般情况下会使用空数组
             final EventHandler<? super T>[] eventHandlers) {
         // 确保还没有启动 启动后不能设置事件处理器
         checkNotStarted();
@@ -554,23 +559,27 @@ public class Disruptor<T> {
             processorSequences[i] = batchEventProcessor.getSequence();
         }
 
-        //
+        // 将消费者序列设置到barrier中
         updateGatingSequencesForNextInChain(barrierSequences, processorSequences);
 
         return new EventHandlerGroup<>(this, consumerRepository, processorSequences);
     }
 
     /**
-     *
+     * 将消费者序列设置到 barrier 中
      * @param barrierSequences   初始化 barrier 使用的数组
      * @param processorSequences   对应eventHandler 的序列数组
      */
     private void updateGatingSequencesForNextInChain(final Sequence[] barrierSequences, final Sequence[] processorSequences) {
         if (processorSequences.length > 0) {
+            // 为 ringBuffer 设置一组消费者 Gating 这样生产者想要分配序列 必须先确保最慢的消费者已处理完对应的slot
             ringBuffer.addGatingSequences(processorSequences);
+            // 代表 barrier 依赖的其他前置序列
             for (final Sequence barrierSequence : barrierSequences) {
+                // 避免重复添加
                 ringBuffer.removeGatingSequence(barrierSequence);
             }
+            // 找到前置序列对应的 消费者 标记正在使用中
             consumerRepository.unMarkEventProcessorsAsEndOfChain(barrierSequences);
         }
     }
