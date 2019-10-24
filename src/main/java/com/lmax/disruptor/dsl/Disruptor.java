@@ -423,6 +423,7 @@ public class Disruptor<T> {
      *
      * <p>This method will not shutdown the executor, nor will it await the final termination of the
      * processor threads.</p>
+     * 终止
      */
     public void shutdown() {
         try {
@@ -445,12 +446,15 @@ public class Disruptor<T> {
      */
     public void shutdown(final long timeout, final TimeUnit timeUnit) throws TimeoutException {
         final long timeOutAt = System.currentTimeMillis() + timeUnit.toMillis(timeout);
+        // 判定有积压消息 不断自旋 直到任务被处理完
         while (hasBacklog()) {
+            // timeout 为负数 自旋直到任务处理完 如果是正数 那么超时就不能处理任务了
             if (timeout >= 0 && System.currentTimeMillis() > timeOutAt) {
                 throw TimeoutException.INSTANCE;
             }
             // Busy spin
         }
+        // 当调用该方法后 消费者 尝试消费数据 就会返回 halt异常
         halt();
     }
 
