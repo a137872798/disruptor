@@ -22,7 +22,7 @@ public class BasicExecutor implements Executor
     }
 
     /**
-     * 使用了每执行一个任务就创建一个线程的 lowB 工厂
+     * 每个消费者会固定绑定一条线程
      * @param command
      */
     @Override
